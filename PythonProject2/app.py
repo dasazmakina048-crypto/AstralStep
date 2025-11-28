@@ -34,19 +34,16 @@ def get_task(task_id):
         return jsonify({'error': 'Задача не найдена'}), 404
     return jsonify({'task': task})
 
-
-@app.route('/tasks', methods=['POST'])
-def create_task():
-    if not request.json or 'title' not in request.json:
-        return jsonify({'error': 'Некорректный запрос'}), 400
-
-    task = {
-        'id': len(tasks) + 1,
-        'title': request.json['title'],
-        'done': False
-    }
-    tasks.append(task)
-    return jsonify({'task': task}), 201
+@app.route('/divide', methods=['POST'])
+def sumWithPostBody():
+    reqJson = request.get_json()
+    x = reqJson['x']
+    y = reqJson['y']
+    try:
+        result = x/y
+        return {"message": f"{x} divided by {y} is {result}"}
+    except Exception as err:
+        return {"error": str(err)}, 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=50100, debug=True)
