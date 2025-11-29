@@ -4,7 +4,7 @@ from config import db, GameSession, Player
 import uuid
 import random
 import json
-
+import cards
 from models import User, generate_password_hash, check_password_hash
 
 from flask_login import LoginManager, UserMixin, login_user, current_user, logout_user, login_required
@@ -31,10 +31,8 @@ socketio = SocketIO(app)
 with app.app_context():
     db.create_all()
 
-# Колода карт
-SUITS = ['мечи', 'кубки', 'жезлы', 'пенкакли']
-RANKS = ['2','3','4','5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-
+def create_deck():
+    return [{'suit': s, 'rank': r} for s in cards.suit for r in cards.rank]
 
 def create_deck():
     return [{'suit': s, 'rank': r} for s in SUITS for r in RANKS]
@@ -253,5 +251,6 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
 
 
