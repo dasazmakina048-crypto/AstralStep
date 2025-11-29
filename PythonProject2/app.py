@@ -5,9 +5,25 @@ import uuid
 import random
 import json
 
+from models import User, generate_password_hash, check_password_hash
+
+from flask_login import LoginManager, UserMixin, login_user, current_user, logout_user, login_required
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///game.db'
 app.config['SECRET_KEY'] = 'your-secret-key'
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    """ОБЯЗАТЕЛЬНАЯ функция для Flask-Login."""
+    try:
+        user = User.query.get(int(user_id))
+        return user
+    except Exception:
+        return None
 
 db.init_app(app)
 socketio = SocketIO(app)
@@ -141,5 +157,101 @@ def log():
     return "hello world"
 
 
+# --------------------------------------------
+
+with app.app_context():
+    # Создаются таблицы для GameSession, Player и User
+    db.create_all()
+
+# Колода карт
+SUITS = ['мечи', 'кубки', 'жезлы', 'пенкакли']
+RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+
+
+def create_deck():
+    return [{'suit': s, 'rank': r} for s in SUITS for r in RANKS]
+
+
+# =========================================================
+# === МАРШРУТЫ АВТОРИЗАЦИИ (Ваш вклад) ===
+# =========================================================
+
+@app.route('/register', methods=['POST'])
+def register():
+    if not request.is_json:
+        return jsonify({"msg": "Missing JSON in request"}), 400
+
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    zodiac = data.get('zodiac')
+
+    if not all([username, password, zodiac]):
+        return jsonify({"success": False, "message": "Missing required fields"}), 400
+
+    existing_user = User.query.filter_by(username=username).first()
+
+    if existing_user:
+        return jsonify({"success": False, "message": f'Логин "{username}" уже занят.'}), 409  # 409 Conflict
+
+    password_hash = generate_password_hash(password)
+
+    new_user = User(
+        username=username,
+        password=password_hash,
+        zodiac=zodiac
+    )
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify(
+        {"success": True, "message": "User registered successfully", "user_id": new_user.id}), 201  # 201 Created
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    if not request.is_json:
+        return jsonify({"success": False, "message": "Missing JSON in request"}), 400
+
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    user = User.query.filter_by(username=username).first()
+
+    if user and check_password_hash(user.password, password):
+        login_user(user)
+
+        return jsonify({
+            "success": True,
+            "message": "Login successful",
+            "username": user.username,
+            "zodiac": user.zodiac
+        }), 200
+
+    return jsonify({"success": False, "message": "Invalid username or password"}), 401  # 401 Unauthorized
+
+
+@app.route('/profile', methods=['GET'])
+@login_required
+def profile():
+    return jsonify({
+        "success": True,
+        "username": current_user.username,
+        "zodiac": current_user.zodiac,
+        "is_authenticated": current_user.is_authenticated
+    }), 200
+
+
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"success": True, "message": "Successfully logged out"}), 200
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+
