@@ -34,6 +34,9 @@ with app.app_context():
 def create_deck():
     return [{'suit': s, 'rank': r} for s in cards.suit for r in cards.rank]
 
+@app.route("/card", methods=["GET"])
+def get_card():
+   return create_deck()
 
 @app.route('/game/<game_id>', methods=['PUT'])
 def game(game_id):
@@ -271,3 +274,4 @@ def change_skin():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
