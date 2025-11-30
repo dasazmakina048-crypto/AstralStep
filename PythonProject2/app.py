@@ -1,13 +1,13 @@
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from config import db, GameSession, Player
+from flask_sqlalchemy import SQLAlchemy
 import uuid
 import random
 import json
-import cards
 from models import User, generate_password_hash, check_password_hash
-
 from flask_login import LoginManager, UserMixin, login_user, current_user, logout_user, login_required
+import cards
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///game.db'
@@ -18,7 +18,6 @@ login_manager.init_app(app)
 
 @login_manager.user_loader
 def load_user(user_id):
-    """ОБЯЗАТЕЛЬНАЯ функция для Flask-Login."""
     try:
         user = User.query.get(int(user_id))
         return user
@@ -31,11 +30,9 @@ socketio = SocketIO(app)
 with app.app_context():
     db.create_all()
 
-def create_deck():
-    return [{'suit': s, 'rank': r} for s in cards.suit for r in cards.rank]
 
 def create_deck():
-    return [{'suit': s, 'rank': r} for s in SUITS for r in RANKS]
+    return [{'suit': s, 'rank': r} for s in cards.suit for r in cards.rank]
 
 
 @app.route('/game/<game_id>', methods=['PUT'])
@@ -150,29 +147,8 @@ def play_card(data):
     else:
         emit('error', {'message': 'У вас нет карт'})
 
-@app.route('/', methods=['POST'])
-def log():
-    return "hello world"
-
-
-# --------------------------------------------
-
-with app.app_context():
-    # Создаются таблицы для GameSession, Player и User
-    db.create_all()
-
-# Колода карт
-SUITS = ['мечи', 'кубки', 'жезлы', 'пенкакли']
-RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-
-
-def create_deck():
-    return [{'suit': s, 'rank': r} for s in SUITS for r in RANKS]
-
-
-# =========================================================
-# === МАРШРУТЫ АВТОРИЗАЦИИ (Ваш вклад) ===
-# =========================================================
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SECRET_KEY'] = 'your-secret-key'
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -249,8 +225,49 @@ def logout():
     return jsonify({"success": True, "message": "Successfully logged out"}), 200
 
 
+from flask import Flask, render_template, request, jsonify, session
+from models import db, User
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SECRET_KEY'] = 'your-secret-key'
+
+db.init_app(app)
+
+with app.app_context():
+    db.create_all()
+
+SKINS = ['skin1', 'skin2', 'skin3']
+
+
+@app.route('/dashboard')
+def dashboard():
+    user_id = 1
+    user = User.query.get(user_id)
+
+    if not user:
+        return "Пользователь не найден", 404
+
+    return render_template(
+        'dashboard.html',
+        user=user,
+        available_skins=SKINS
+    )
+
+
+@app.route('/change_skin', methods=['POST'])
+def change_skin():
+    skin = request.json.get('skin')
+    user_id = 1
+
+    user = User.query.get(user_id)
+    if skin in SKINS and user:
+        user.skin = skin
+        db.session.commit()
+        return jsonify({'success': True, 'skin': skin})
+
+    return jsonify({'success': False, 'error': 'Неверный скин'}), 400
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-
-
-
